@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MAP-IN Vision · Identifikasi AI</title>
+<meta name="description" content="Prototipe inspeksi visual 1-master berbasis browser: kamera, Identifikasi AI, trigger otomatis, log ke Google Sheet, dan asisten suara.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#070f1c; --panel:#0d1a2e; --panel2:#12233d; --line:#1f3657; --line2:#2b4a73;
+  --text:#e6edf7; --muted:#8ea3c2; --amber:#ffb000; --amber-d:#c98a00;
+  --ok:#22c55e; --ng:#ef4444; --info:#38bdf8;
+  --r:10px; --mono:'IBM Plex Mono',ui-monospace,monospace; --head:'Space Grotesk',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.45 'IBM Plex Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+h1,h2,h3{font-family:var(--head);margin:0}
+.mono{font-family:var(--mono)}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+.hidden{display:none!important}
+
+/* ---------- header ---------- */
+header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0b1830,#070f1c);position:sticky;top:0;z-index:20}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.logo{width:30px;height:30px;border-radius:7px;background:var(--amber);display:grid;place-items:center;color:#0b1526;font:700 15px var(--head)}
+.brand h1{font-size:16px;letter-spacing:.3px;white-space:nowrap}
+.brand h1 span{color:var(--amber)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--line2);border-radius:99px;font-size:12px;color:var(--muted);background:var(--panel)}
+.chip::before{content:"";width:7px;height:7px;border-radius:50%;background:#4b5d78}
+.chip.on::before{background:var(--ok)} .chip.warn::before{background:var(--amber)} .chip.err::before{background:var(--ng)}
+.btn-assist{border:1px solid var(--amber);background:transparent;color:var(--amber);border-radius:8px;padding:6px 12px;cursor:pointer;font-weight:600;white-space:nowrap}
+.btn-assist:hover{background:rgba(255,176,0,.1)}
+
+/* ---------- layout ---------- */
+.app{display:grid;grid-template-columns:200px minmax(0,1fr) 360px;gap:12px;padding:12px;min-height:calc(100vh - 53px)}
+nav.steps{display:flex;flex-direction:column;gap:6px}
+.step{display:flex;gap:10px;align-items:center;text-align:left;padding:10px;border:1px solid var(--line);background:var(--panel);border-radius:var(--r);cursor:pointer}
+.step b{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;border:1px solid var(--line2);font:600 13px var(--mono);flex:none}
+.step span{font-weight:600}
+.step small{display:block;color:var(--muted);font-size:11px;font-weight:400}
+.step.active{border-color:var(--amber);background:var(--panel2)}
+.step.active b{background:var(--amber);color:#0b1526;border-color:var(--amber)}
+.step.done b{border-color:var(--ok);color:var(--ok)}
+
+.viewer{display:flex;flex-direction:column;gap:10px;min-width:0}
+.screen{position:relative;background:#000;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;min-height:240px;display:grid;place-items:center}
+#view{display:block;width:100%;height:auto;max-height:70vh;object-fit:contain;touch-action:none}
+.screen .placeholder{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:20px;color:var(--muted)}
+.verdict{position:absolute;top:10px;left:10px;padding:6px 16px;border-radius:8px;font:700 30px var(--head);letter-spacing:1px;background:rgba(0,0,0,.55);border:2px solid var(--line2)}
+.verdict.ok{color:var(--ok);border-color:var(--ok)} .verdict.ng{color:var(--ng);border-color:var(--ng)}
+.hint{position:absolute;bottom:10px;left:10px;right:10px;font-size:12px;color:#cfe0f5;background:rgba(7,15,28,.75);padding:6px 10px;border-radius:6px;pointer-events:none}
+
+.readout{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;min-width:0}
+.kpi label{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi output{display:block;font:600 18px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi.ok output{color:var(--ok)} .kpi.ng output{color:var(--ng)}
+
+.scorebar{position:relative;height:16px;background:var(--panel2);border:1px solid var(--line);border-radius:99px;overflow:hidden}
+.scorebar .fill{position:absolute;inset:0 auto 0 0;width:0;background:linear-gradient(90deg,#334a6b,var(--info));transition:width .15s}
+.scorebar .thr{position:absolute;top:-2px;bottom:-2px;width:3px;background:var(--amber);left:80%}
+.scorebar.ok .fill{background:linear-gradient(90deg,#14532d,var(--ok))} .scorebar.ng .fill{background:linear-gradient(90deg,#7f1d1d,var(--ng))}
+
+.history{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.history figure{margin:0;flex:none;width:68px;text-align:center}
+.history img{width:68px;height:52px;object-fit:cover;border-radius:6px;border:2px solid var(--line2);display:block}
+.history figure.ok img{border-color:var(--ok)} .history figure.ng img{border-color:var(--ng)}
+.history figcaption{font:11px var(--mono);color:var(--muted)}
+
+/* ---------- panels ---------- */
+aside.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:12px;align-self:start;position:sticky;top:65px;max-height:calc(100vh - 77px);overflow:auto}
+aside.panel h2{font-size:17px}
+aside.panel h2 small{display:block;color:var(--muted);font:400 12px 'IBM Plex Sans',sans-serif;margin-top:2px}
+fieldset{border:1px solid var(--line);border-radius:8px;padding:10px;margin:0;display:flex;flex-direction:column;gap:8px}
+legend{padding:0 6px;color:var(--amber);font:600 12px var(--head);letter-spacing:.4px;text-transform:uppercase}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row > *{min-width:0}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);flex:1}
+input[type=text],input[type=url],input[type=password],input[type=number],select{background:#081325;border:1px solid var(--line2);border-radius:6px;padding:7px 9px;width:100%;color:var(--text)}
+input[type=range]{width:100%;accent-color:var(--amber)}
+label.tg{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px}
+label.tg input{accent-color:var(--amber);width:16px;height:16px}
+.btn{border:1px solid var(--line2);background:var(--panel2);border-radius:7px;padding:8px 12px;cursor:pointer;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--amber)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--amber);border-color:var(--amber);color:#0b1526}
+.btn.primary:hover{background:#ffc233}
+.btn.danger{border-color:#7f1d1d;color:#fca5a5}
+.btn.big{padding:12px;font-size:15px;flex:1}
+a.btn{text-decoration:none;color:var(--text);display:inline-block}
+.samples{display:flex;gap:6px;flex-wrap:wrap}
+.samples .s{position:relative}
+.samples img{width:64px;height:64px;object-fit:cover;border-radius:6px;border:2px solid var(--ok);display:block}
+.samples.ng img{border-color:var(--ng)}
+.samples .s button{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:#000c;color:#fff;cursor:pointer;font-size:12px;line-height:1}
+.empty{color:var(--muted);font-size:12px;font-style:italic}
+.note{font-size:12px;color:var(--muted);background:#081325;border-left:3px solid var(--amber);padding:7px 9px;border-radius:4px}
+.plist{display:flex;flex-direction:column;gap:6px}
+.plist .p{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:7px;padding:7px}
+.plist .p div{flex:1;min-width:0}
+.plist .p b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meter{height:6px;background:var(--panel2);border-radius:99px;overflow:hidden}
+.meter i{display:block;height:100%;width:0;background:var(--info);transition:width .1s}
+
+/* ---------- assistant ---------- */
+.assist{position:fixed;right:12px;bottom:12px;width:380px;max-width:calc(100vw - 24px);height:560px;max-height:calc(100vh - 80px);background:var(--panel);border:1px solid var(--amber);border-radius:14px;box-shadow:0 20px 50px #000a;display:flex;flex-direction:column;z-index:50}
+.assist header{position:static;border-radius:14px 14px 0 0;padding:10px 12px}
+.assist header h3{font-size:15px}
+.assist header .x{margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer}
+.msgs{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.msg{max-width:88%;padding:8px 11px;border-radius:12px;white-space:pre-wrap;word-wrap:break-word}
+.msg.user{align-self:flex-end;background:#1d3a63;border-bottom-right-radius:3px}
+.msg.assistant{align-self:flex-start;background:var(--panel2);border:1px solid var(--line);border-bottom-left-radius:3px}
+.msg.sys{align-self:center;font-size:12px;color:var(--muted);background:none;padding:2px}
+.msg .act{display:block;margin-top:5px;font:12px var(--mono);color:var(--amber)}
+.msg img{display:block;max-width:100%;border-radius:6px;margin-top:6px}
+.composer{border-top:1px solid var(--line);padding:10px;display:flex;flex-direction:column;gap:8px}
+.composer .row{flex-wrap:nowrap}
+.composer input[type=text]{flex:1}
+.mic{width:44px;height:40px;border-radius:9px;border:1px solid var(--line2);background:var(--panel2);cursor:pointer;display:grid;place-items:center;flex:none}
+.mic.rec{background:var(--ng);border-color:var(--ng);animation:pulse 1s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 6px rgba(239,68,68,.25)}}
+.quick{display:flex;gap:6px;flex-wrap:wrap}
+.quick button{border:1px solid var(--line2);background:transparent;border-radius:99px;padding:3px 9px;font-size:12px;cursor:pointer;color:var(--muted)}
+.quick button:hover{color:var(--amber);border-color:var(--amber)}
+
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line2);padding:9px 14px;border-radius:8px;z-index:60;max-width:90vw;box-shadow:0 8px 20px #0008}
+.toast.err{border-color:var(--ng)} .toast.ok{border-color:var(--ok)}
+
+@media (max-width:1100px){
+  .app{grid-template-columns:minmax(0,1fr) 340px}
+  nav.steps{grid-column:1 / -1;flex-direction:row;overflow-x:auto}
+  .step{flex:none}
+}
+@media (max-width:760px){
+  header{flex-wrap:wrap;padding:10px 16px}
+  .chips{order:3;width:100%;margin-left:0}
+  .app{grid-template-columns:minmax(0,1fr);padding:10px 16px}
+  aside.panel{position:static;max-height:none}
+  .readout{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .step small{display:none}
+  .assist{right:8px;left:8px;width:auto;bottom:8px;height:70vh}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo">M</div><h1>MAP-IN Vision <span>· Identifikasi AI</span></h1></div>
+  <div class="chips">
+    <span class="chip" id="chipCam">Kamera</span>
+    <span class="chip" id="chipEngine">Mesin</span>
+    <span class="chip" id="chipServer">Server</span>
+    <span class="chip" id="chipRt">Realtime</span>
+    <span class="chip" id="chipProg">Program</span>
+  </div>
+  <button class="btn-assist" id="btnAssist">🎙 Asisten</button>
+</header>
+
+<div class="app">
+  <nav class="steps" id="steps">
+    <button class="step active" data-step="1"><b>1</b><span>Kamera<small>Sumber &amp; gambar</small></span></button>
+    <button class="step" data-step="2"><b>2</b><span>Master &amp; ROI<small>Area &amp; sampel</small></span></button>
+    <button class="step" data-step="3"><b>3</b><span>Penilaian<small>Mesin &amp; ambang</small></span></button>
+    <button class="step" data-step="4"><b>4</b><span>Jalankan<small>Trigger &amp; hasil</small></span></button>
+    <button class="step" data-step="5"><b>5</b><span>Output &amp; Server<small>Log, program</small></span></button>
+  </nav>
+
+  <section class="viewer">
+    <div class="screen">
+      <canvas id="view" width="1280" height="720"></canvas>
+      <div class="placeholder" id="placeholder">
+        <div>
+          <p>Kamera belum aktif.</p>
+          <button class="btn primary" id="btnCamStart">Nyalakan Kamera</button>
+          <p class="small">Izinkan akses kamera di browser. Butuh HTTPS (GitHub Pages) atau localhost.</p>
+        </div>
+      </div>
+      <div class="verdict hidden" id="verdict">—</div>
+      <div class="hint hidden" id="hint"></div>
+    </div>
+
+    <div class="scorebar" id="scorebar"><div class="fill" id="scoreFill"></div><div class="thr" id="scoreThr"></div></div>
+
+    <div class="readout">
+      <div class="kpi" id="kRes"><label>Hasil</label><output id="oRes">—</output></div>
+      <div class="kpi"><label id="lScore">Skor</label><output id="oScore">—</output></div>
+      <div class="kpi"><label>dX, dY (px)</label><output id="oPos">—</output></div>
+      <div class="kpi"><label>Proses</label><output id="oMs">—</output></div>
+      <div class="kpi"><label>OK / NG</label><output id="oCount">0 / 0</output></div>
+      <div class="kpi"><label>Yield</label><output id="oYield">—</output></div>
+    </div>
+
+    <div class="history" id="history"></div>
+  </section>
+
+  <aside class="panel">
+    <!-- STEP 1 -->
+    <div class="pane" data-pane="1">
+      <h2>1 · Kamera<small>Pilih kamera dan atur kualitas gambar.</small></h2>
+      <fieldset>
+        <legend>Sumber</legend>
+        <label class="f">Kamera<select id="selCam"><option value="">(default)</option></select></label>
+        <label class="f">Resolusi
+          <select id="selRes">
+            <option value="640x480">640 × 480 (ringan)</option>
+            <option value="1280x720" selected>1280 × 720</option>
+            <option value="1920x1080">1920 × 1080</option>
+          </select>
+        </label>
+        <div class="row"><button class="btn" id="btnCamRestart">Terapkan / Mulai Ulang</button></div>
+      </fieldset>
+      <fieldset>
+        <legend>Gambar</legend>
+        <label class="f">Kecerahan <span class="mono" id="vBright">100%</span><input type="range" id="rBright" min="40" max="200" value="100"></label>
+        <label class="f">Kontras <span class="mono" id="vContrast">100%</span><input type="range" id="rContrast" min="40" max="250" value="100"></label>
+        <div class="row">
+          <button class="btn primary" id="btnAutoImg">✨ Saran Gambar Otomatis</button>
+          <button class="btn" id="btnImgReset">Reset</button>
+        </div>
+        <p class="note">Saran otomatis mencoba beberapa kombinasi kecerahan/kontras dan memilih yang paling tajam di area ROI. Atur gambar <b>sebelum</b> mendaftarkan master.</p>
+      </fieldset>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="pane hidden" data-pane="2">
+      <h2>2 · Master &amp; ROI<small>Tarik kotak di gambar kamera untuk menentukan area inspeksi.</small></h2>
+      <fieldset>
+        <legend>Program</legend>
+        <label class="f">Nama program<input type="text" id="inpProgName" maxlength="40"></label>
+        <div class="row"><button class="btn" id="btnNewProg">Program Baru</button></div>
+      </fieldset>
+      <fieldset>
+        <legend>ROI</legend>
+        <p class="small muted">Klik &amp; tarik di gambar kamera. ROI sekarang: <span class="mono" id="oRoi">—</span></p>
+        <div class="row"><button class="btn" id="btnRoiFull">ROI Tengah (default)</button></div>
+      </fieldset>
+      <fieldset>
+        <legend>Sampel OK (master)</legend>
+        <div class="samples" id="okList"></div>
+        <button class="btn primary" id="btnCapOk">📸 Daftarkan Master (OK)</button>
+        <p class="small muted">1 gambar sudah cukup. Tambah 2–5 sampel OK yang bervariasi agar lebih stabil.</p>
+      </fieldset>
+      <fieldset>
+        <legend>Sampel NG (opsional)</legend>
+        <div class="samples ng" id="ngList"></div>
+        <button class="btn danger" id="btnCapNg">📸 Tambah Sampel NG</button>
+        <p class="small muted">Dipakai untuk menghitung ambang otomatis.</p>
+      </fieldset>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="pane hidden" data-pane="3">
+      <h2>3 · Penilaian<small>Pilih mesin penilai dan atur ambang OK/NG.</small></h2>
+      <fieldset>
+        <legend>Mesin penilai</legend>
+        <label class="tg"><input type="radio" name="engine" value="ai" checked> AI — embedding MobileNetV3 (di browser)</label>
+        <label class="tg"><input type="radio" name="engine" value="classic"> Klasik — korelasi pola &amp; tepi</label>
+        <p class="small muted" id="oEngineState">—</p>
+      </fieldset>
+      <fieldset>
+        <legend>Pelacakan posisi</legend>
+        <label class="tg"><input type="checkbox" id="chkTrack" checked> Ikuti posisi benda (toleransi geser)</label>
+        <label class="f">Area cari ± <span class="mono" id="vMargin">25%</span><input type="range" id="rMargin" min="5" max="60" value="25"></label>
+      </fieldset>
+      <fieldset>
+        <legend>Ambang</legend>
+        <label class="f">Ambang OK <span class="mono" id="vThr">0.80</span><input type="range" id="rThr" min="0.30" max="0.99" step="0.01" value="0.80"></label>
+        <div class="row"><button class="btn primary" id="btnAutoThr">⚙ Ambang Otomatis</button></div>
+        <p class="small muted" id="oThrInfo">Skor langsung tampil di bar atas saat langkah ini aktif.</p>
+      </fieldset>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="pane hidden" data-pane="4">
+      <h2>4 · Jalankan<small>Pilih cara trigger lalu mulai inspeksi.</small></h2>
+      <fieldset>
+        <legend>Trigger</legend>
+        <label class="tg"><input type="radio" name="trig" value="manual" checked> Manual (tombol / suara "periksa")</label>
+        <label class="tg"><input type="radio" name="trig" value="continuous"> Kontinu</label>
+        <label class="tg"><input type="radio" name="trig" value="ai"> Trigger AI (benda masuk lalu diam)</label>
+        <label class="f" id="wrapInterval">Interval kontinu (ms)<input type="number" id="inpInterval" min="200" max="10000" step="100" value="800"></label>
+        <div id="wrapAiTrig" class="hidden">
+          <label class="f">Sensitivitas gerak <span class="mono" id="vMove">6</span><input type="range" id="rMove" min="2" max="25" value="6"></label>
+          <div class="small muted">Gerak sekarang</div><div class="meter"><i id="motionBar"></i></div>
+          <div class="row"><button class="btn" id="btnBg">Daftarkan Latar Kosong</button><span class="small muted" id="oBg">belum ada</span></div>
+        </div>
+      </fieldset>
+      <div class="row">
+        <button class="btn primary big" id="btnRun">▶ Mulai</button>
+        <button class="btn big" id="btnOnce">Periksa Sekali</button>
+      </div>
+      <div class="row">
+        <button class="btn" id="btnAskNg">🤖 Tanya Asisten soal hasil terakhir</button>
+        <button class="btn" id="btnResetCnt">Reset Hitungan</button>
+      </div>
+      <fieldset>
+        <legend>Saat NG</legend>
+        <label class="tg"><input type="checkbox" id="chkBeep" checked> Bunyi peringatan</label>
+        <label class="tg"><input type="checkbox" id="chkAutoAsk"> Otomatis minta analisis asisten (pakai kuota Gemini)</label>
+      </fieldset>
+    </div>
+
+    <!-- STEP 5 -->
+    <div class="pane hidden" data-pane="5">
+      <h2>5 · Output &amp; Server<small>Cloudflare (realtime) → Google Apps Script → Sheet &amp; Drive milik Anda.</small></h2>
+      <fieldset>
+        <legend>Cloudflare Realtime</legend>
+        <label class="f">URL Worker<input type="url" id="inpWk" placeholder="https://mapin-vision-rt.&lt;akun&gt;.workers.dev"></label>
+        <div class="row">
+          <label class="f">Line / Room<input type="text" id="inpRoom" maxlength="40"></label>
+          <label class="f">ID Stasiun<input type="text" id="inpStId" maxlength="40"></label>
+        </div>
+        <label class="f">Nama Stasiun<input type="text" id="inpStName" maxlength="40"></label>
+        <label class="tg"><input type="checkbox" id="chkRt" checked> Kirim hasil realtime ke monitor</label>
+        <div class="row"><button class="btn primary" id="btnRt">Hubungkan</button><a class="btn" id="lnkMonitor" href="monitor.html" target="_blank" rel="noopener">📺 Buka Monitor</a></div>
+        <p class="small" id="oRt"></p>
+      </fieldset>
+      <fieldset>
+        <legend>Database Google Drive (GAS)</legend>
+        <label class="f">Token aplikasi (APP_TOKEN)<input type="password" id="inpToken" placeholder="sama dengan di Worker / GAS"></label>
+        <label class="f">URL Web App GAS <span class="muted">(kosongkan jika lewat Worker)</span><input type="url" id="inpGas" placeholder="https://script.google.com/macros/s/…/exec"></label>
+        <div class="row"><button class="btn" id="btnPing">Tes Koneksi Database</button><span class="small" id="oPing"></span></div>
+      </fieldset>
+      <fieldset>
+        <legend>Output</legend>
+        <label class="tg"><input type="checkbox" id="chkLog" checked> Kirim log hasil ke Google Sheet</label>
+        <label class="tg"><input type="checkbox" id="chkSaveNg"> Simpan gambar NG ke Google Drive</label>
+        <label class="tg"><input type="checkbox" id="chkTts" checked> Asisten menjawab dengan suara</label>
+        <div class="row"><button class="btn" id="btnCsv">⬇ Unduh Log (CSV)</button><button class="btn" id="btnStats">Ringkasan Hari Ini</button></div>
+        <p class="small muted" id="oStats"></p>
+      </fieldset>
+      <fieldset>
+        <legend>Program</legend>
+        <div class="row"><button class="btn primary" id="btnSaveProg">💾 Simpan Program</button><button class="btn" id="btnListProg">↻ Daftar di Server</button></div>
+        <div class="plist" id="progList"><span class="empty">Belum dimuat.</span></div>
+      </fieldset>
+    </div>
+  </aside>
+</div>
+
+<!-- ASSISTANT -->
+<div class="assist hidden" id="assist">
+  <header>
+    <div class="logo">AI</div>
+    <div><h3>Asisten MAP-IN Vision</h3><div class="small muted" id="oAssistState">Tekan 🎙 lalu bicara</div></div>
+    <button class="x" id="btnAssistClose" aria-label="Tutup">×</button>
+  </header>
+  <div class="msgs" id="msgs"></div>
+  <div class="composer">
+    <div class="quick">
+      <button data-q="Bagaimana cara memakai aplikasi ini?">Cara pakai</button>
+      <button data-q="Kenapa hasil terakhir NG? Lihat gambarnya.">Kenapa NG?</button>
+      <button data-q="Ambang yang cocok berapa?">Saran ambang</button>
+      <button data-q="periksa">Periksa</button>
+    </div>
+    <div class="row">
+      <button class="mic" id="btnMic" title="Bicara">🎙</button>
+      <input type="text" id="inpChat" placeholder="Ketik atau tekan 🎙…" autocomplete="off">
+      <button class="btn primary" id="btnSend">Kirim</button>
+    </div>
+    <label class="tg small"><input type="checkbox" id="chkSendImg"> Sertakan gambar kamera</label>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

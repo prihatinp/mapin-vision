@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MAP-IN Vision · Monitor Realtime</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070f1c;--panel:#0d1a2e;--panel2:#12233d;--line:#1f3657;--line2:#2b4a73;--text:#e6edf7;--muted:#8ea3c2;--amber:#ffb000;--ok:#22c55e;--ng:#ef4444;--info:#38bdf8;--mono:'IBM Plex Mono',ui-monospace,monospace;--head:'Space Grotesk',system-ui,sans-serif}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.45 'IBM Plex Sans',system-ui,sans-serif;min-height:100vh}
+button,input{font:inherit;color:inherit}
+h1,h2,h3{font-family:var(--head);margin:0}
+.muted{color:var(--muted)} .mono{font-family:var(--mono)} .small{font-size:12px} .hidden{display:none!important}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0b1830,#070f1c);position:sticky;top:0;z-index:10}
+.logo{width:30px;height:30px;border-radius:7px;background:var(--amber);display:grid;place-items:center;color:#0b1526;font:700 15px var(--head)}
+header h1{font-size:16px} header h1 span{color:var(--amber)}
+.sp{flex:1}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--line2);border-radius:99px;font-size:12px;color:var(--muted);background:var(--panel)}
+.chip::before{content:"";width:7px;height:7px;border-radius:50%;background:#4b5d78}
+.chip.on::before{background:var(--ok)} .chip.warn::before{background:var(--amber)} .chip.err::before{background:var(--ng)}
+.btn{border:1px solid var(--line2);background:var(--panel2);border-radius:7px;padding:6px 11px;cursor:pointer;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--amber)} .btn.primary{background:var(--amber);border-color:var(--amber);color:#0b1526}
+.btn.danger{border-color:#7f1d1d;color:#fca5a5} .btn:disabled{opacity:.4;cursor:not-allowed}
+main{padding:12px 16px;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:12px}
+.kpis{grid-column:1/-1;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:0}
+.kpi label{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.6px}
+.kpi output{display:block;font:600 22px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi.ok output{color:var(--ok)} .kpi.ng output{color:var(--ng)} .kpi .small{font-family:'IBM Plex Sans',sans-serif}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;align-content:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;transition:border-color .2s,box-shadow .2s}
+.card.off{opacity:.55}
+.card.alarm{border-color:var(--ng);box-shadow:0 0 0 3px rgba(239,68,68,.35)}
+.card .top{display:flex;align-items:center;gap:8px}
+.card .top h3{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{width:9px;height:9px;border-radius:50%;background:#4b5d78;flex:none} .dot.on{background:var(--ok)}
+.badge{margin-left:auto;font:600 11px var(--mono);padding:2px 7px;border-radius:5px;border:1px solid var(--line2);color:var(--muted);white-space:nowrap}
+.badge.run{color:#0b1526;background:var(--ok);border-color:var(--ok)}
+.card .mid{display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;align-items:center}
+.thumb{width:110px;height:84px;border-radius:8px;object-fit:cover;background:#000;border:2px solid var(--line2);display:block}
+.thumb.ok{border-color:var(--ok)} .thumb.ng{border-color:var(--ng)}
+.verdict{font:700 34px var(--head);letter-spacing:1px;line-height:1}
+.verdict.ok{color:var(--ok)} .verdict.ng{color:var(--ng)} .verdict.none{color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;text-align:center}
+.stats div{background:var(--panel2);border-radius:7px;padding:5px}
+.stats b{display:block;font:600 16px var(--mono)} .stats span{font-size:11px;color:var(--muted)}
+.spark{display:flex;gap:2px;height:16px;align-items:flex-end}
+.spark i{flex:1;min-width:2px;height:100%;border-radius:1px;background:var(--ok);opacity:.8} .spark i.n{background:var(--ng)}
+.actions{display:flex;gap:6px;flex-wrap:wrap}
+aside{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;align-self:start;position:sticky;top:64px;max-height:calc(100vh - 76px);overflow:auto}
+aside h2{font-size:15px;margin-bottom:8px}
+.feed{display:flex;flex-direction:column;gap:6px}
+.item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;border-bottom:1px solid var(--line);padding-bottom:6px}
+.item .r{font:700 13px var(--mono);padding:2px 6px;border-radius:4px}
+.item .r.ok{color:var(--ok);border:1px solid var(--ok)} .item .r.ng{color:#fff;background:var(--ng)}
+.item img{width:100%;max-width:220px;border-radius:6px;border:2px solid var(--ng);grid-column:1/-1}
+.item .who{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.empty{color:var(--muted);font-style:italic;padding:20px;text-align:center;grid-column:1/-1}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--amber);border-radius:12px;padding:16px;width:min(440px,calc(100vw - 32px))}
+dialog::backdrop{background:#000a}
+dialog label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);margin-bottom:10px}
+dialog input{background:#081325;border:1px solid var(--line2);border-radius:6px;padding:8px;width:100%}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line2);padding:9px 14px;border-radius:8px;z-index:60;max-width:90vw}
+@media (max-width:900px){main{grid-template-columns:minmax(0,1fr)} aside{position:static;max-height:none} .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .kpis .kpi:last-child{grid-column:1/-1}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">M</div>
+  <h1>MAP-IN Vision <span>· Monitor Realtime</span></h1>
+  <span class="chip" id="chipConn">Belum terhubung</span>
+  <span class="chip" id="chipRoom">Line —</span>
+  <div class="sp"></div>
+  <label class="small"><input type="checkbox" id="chkSound" checked> Alarm NG</label>
+  <button class="btn" id="btnSettings">⚙ Pengaturan</button>
+</header>
+
+<main>
+  <section class="kpis">
+    <div class="kpi"><label>Total hari ini</label><output id="kTotal">0</output></div>
+    <div class="kpi ok"><label>OK</label><output id="kOk">0</output></div>
+    <div class="kpi ng"><label>NG</label><output id="kNg">0</output></div>
+    <div class="kpi"><label>Yield</label><output id="kYield">—</output></div>
+    <div class="kpi"><label>Database (Google Drive)</label><output id="kDb" class="small">—</output></div>
+  </section>
+  <section class="grid" id="grid"><div class="empty">Menunggu data stasiun…</div></section>
+  <aside>
+    <h2>Hasil terbaru</h2>
+    <div class="feed" id="feed"><div class="empty">Belum ada hasil.</div></div>
+  </aside>
+</main>
+
+<dialog id="dlg">
+  <form method="dialog">
+    <h3 style="margin-bottom:12px">Pengaturan Monitor</h3>
+    <label>URL Worker Cloudflare<input type="url" id="inWk" placeholder="https://mapin-vision-rt.<akun>.workers.dev" required></label>
+    <label>Token aplikasi (APP_TOKEN)<input type="password" id="inTok"></label>
+    <label>Line / Room<input type="text" id="inRoom" value="line-1"></label>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" value="cancel" formnovalidate>Batal</button><button class="btn primary" value="ok">Simpan &amp; Hubungkan</button></div>
+  </form>
+</dialog>
+<div class="toast hidden" id="toast"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const tm = (iso) => { try { return new Date(iso).toLocaleTimeString('id-ID', { hour12: false }); } catch { return ''; } };
+
+function loadCfg() {
+  let cfg = {};
+  try { cfg = JSON.parse(localStorage.getItem('mv_monitor')) || {}; } catch {}
+  if (!cfg.wkUrl) { // ambil dari pengaturan aplikasi stasiun di browser yang sama
+    try { const s = JSON.parse(localStorage.getItem('mv_settings')) || {}; cfg = { wkUrl: s.wkUrl, token: s.token, room: s.room, ...cfg }; } catch {}
+  }
+  const q = new URLSearchParams(location.search);
+  if (q.get('room')) cfg.room = q.get('room');
+  if (q.get('wk')) cfg.wkUrl = q.get('wk');
+  return { wkUrl: '', token: '', room: 'line-1', ...cfg };
+}
+let CFG = loadCfg();
+const saveCfg = () => { try { localStorage.setItem('mv_monitor', JSON.stringify(CFG)); } catch {} };
+
+const ST = { stations: {}, recent: [], ws: null, retry: 0, rT: null, pT: null, db: null, gas: false, date: '' };
+
+let toastT;
+function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.remove('hidden'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.add('hidden'), 3000); }
+function chip(id, txt, cls) { const e = $(id); e.textContent = txt; e.className = 'chip ' + (cls || ''); }
+
+let actx;
+function alarm() {
+  if (!$('#chkSound').checked) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.18].forEach((d) => { const o = actx.createOscillator(), g = actx.createGain(); o.type = 'square'; o.frequency.value = 940; g.gain.value = 0.07; o.connect(g).connect(actx.destination); o.start(actx.currentTime + d); o.stop(actx.currentTime + d + 0.12); });
+  } catch {}
+}
+
+function connect() {
+  clearTimeout(ST.rT); clearInterval(ST.pT);
+  if (ST.ws) { const w = ST.ws; ST.ws = null; try { w.close(); } catch {} }
+  chip('#chipRoom', 'Line ' + CFG.room);
+  if (!CFG.wkUrl) { chip('#chipConn', 'Atur URL Worker', 'warn'); $('#dlg').showModal(); return; }
+  chip('#chipConn', 'Menghubungkan…', 'warn');
+  const q = new URLSearchParams({ room: CFG.room, role: 'monitor', id: 'mon-' + Math.random().toString(36).slice(2, 7), token: CFG.token || '' });
+  const ws = new WebSocket(CFG.wkUrl.replace(/\/+$/, '').replace(/^http/, 'ws') + '/ws?' + q);
+  ST.ws = ws;
+  ws.onopen = () => { ST.retry = 0; chip('#chipConn', 'Realtime terhubung', 'on'); ST.pT = setInterval(() => ws.readyState === 1 && ws.send('ping'), 25000); };
+  ws.onmessage = (e) => { if (e.data === 'pong') return; let m; try { m = JSON.parse(e.data); } catch { return; } onMsg(m); };
+  ws.onclose = (e) => {
+    clearInterval(ST.pT); if (ST.ws !== ws) return; ST.ws = null;
+    chip('#chipConn', e.code === 1006 && ST.retry > 2 ? 'Gagal terhubung (cek URL/token)' : 'Terputus — mencoba lagi', 'err');
+    ST.rT = setTimeout(connect, Math.min(30000, 1000 * 2 ** ST.retry++));
+  };
+}
+
+function onMsg(m) {
+  if (m.t === 'snapshot') {
+    ST.stations = {}; m.stations.forEach((s) => (ST.stations[s.id] = s));
+    ST.recent = m.recent || []; ST.gas = m.gas; ST.date = m.date;
+    ST.db = { queue: m.queue };
+    renderAll();
+  } else if (m.t === 'station') {
+    ST.stations[m.station.id] = m.station; renderCard(m.station.id); renderKpis();
+  } else if (m.t === 'result') {
+    ST.stations[m.station.id] = m.station;
+    ST.recent.unshift(m.r); ST.recent.length = Math.min(ST.recent.length, 40);
+    renderCard(m.station.id, m.r.result === 'NG'); renderFeed(); renderKpis();
+    if (m.r.result === 'NG') alarm();
+  } else if (m.t === 'db') {
+    ST.db = m; renderKpis();
+  } else if (m.t === 'cmd-ack') {
+    toast(m.delivered ? `Perintah "${m.cmd}" terkirim ke ${m.to}.` : `Stasiun ${m.to} sedang offline.`);
+  }
+}
+
+function sendCmd(to, cmd) {
+  if (!ST.ws || ST.ws.readyState !== 1) { toast('Monitor belum terhubung.'); return; }
+  if (cmd === 'reset_counter' && !confirm('Reset hitungan hari ini untuk stasiun ini?')) return;
+  ST.ws.send(JSON.stringify({ t: 'cmd', to, cmd }));
+}
+
+function renderAll() { renderGrid(); renderFeed(); renderKpis(); }
+
+function renderKpis() {
+  let ok = 0, ng = 0;
+  Object.values(ST.stations).forEach((s) => { ok += s.ok; ng += s.ng; });
+  const t = ok + ng;
+  $('#kTotal').textContent = t; $('#kOk').textContent = ok; $('#kNg').textContent = ng;
+  $('#kYield').textContent = t ? (ok / t * 100).toFixed(1) + '%' : '—';
+  let db = '—';
+  if (!ST.gas) db = 'GAS belum diatur di Worker';
+  else if (ST.db?.flush) db = (ST.db.flush.ok ? '✓ tersimpan ' + tm(ST.db.flush.at) : '✗ ' + ST.db.flush.error) + ' · antre ' + ST.db.queue;
+  else if (ST.db) db = 'Siap · antre ' + (ST.db.queue ?? 0);
+  $('#kDb').textContent = db;
+}
+
+function cardHtml(s) {
+  const l = s.last, cls = l ? l.result.toLowerCase() : 'none';
+  const spark = (s.spark || []).map((v) => `<i class="${v ? '' : 'n'}"></i>`).join('');
+  return `
+    <div class="top"><span class="dot ${s.online ? 'on' : ''}" title="${s.online ? 'online' : 'offline'}"></span>
+      <h3>${esc(s.name)}</h3><span class="small muted mono">${esc(s.id)}</span>
+      <span class="badge ${s.running && s.online ? 'run' : ''}">${s.online ? (s.running ? 'BERJALAN' : 'SIAGA') : 'OFFLINE'}</span></div>
+    <div class="small muted">Program: <b style="color:var(--text)">${esc(s.program || '—')}</b> · trigger ${esc(s.trigger || '—')} · ${esc(s.engine || '')}</div>
+    <div class="mid">
+      ${l?.thumb ? `<img class="thumb ${cls}" src="${l.thumb}" alt="">` : `<div class="thumb"></div>`}
+      <div><div class="verdict ${cls}">${l ? l.result : '—'}</div>
+        <div class="mono small">${l ? `skor ${Number(l.score).toFixed(3)} / ${Number(l.thr).toFixed(2)}` : 'belum ada hasil'}</div>
+        <div class="mono small muted">${l ? `${tm(l.ts)} · ${l.ms} ms · dX ${l.dx} dY ${l.dy}` : ''}</div></div>
+    </div>
+    <div class="stats"><div><b style="color:var(--ok)">${s.ok}</b><span>OK</span></div><div><b style="color:var(--ng)">${s.ng}</b><span>NG</span></div><div><b>${s.yield == null ? '—' : (s.yield * 100).toFixed(1) + '%'}</b><span>Yield</span></div></div>
+    <div class="spark" title="60 hasil terakhir">${spark}</div>
+    <div class="actions">
+      <button class="btn primary" data-cmd="start_run" ${s.online ? '' : 'disabled'}>▶ Mulai</button>
+      <button class="btn" data-cmd="stop_run" ${s.online ? '' : 'disabled'}>■ Stop</button>
+      <button class="btn" data-cmd="inspect_once" ${s.online ? '' : 'disabled'}>Periksa</button>
+      <button class="btn danger" data-cmd="reset_counter">Reset</button>
+    </div>`;
+}
+
+function renderGrid() {
+  const list = Object.values(ST.stations).sort((a, b) => (b.online - a.online) || a.name.localeCompare(b.name));
+  const g = $('#grid');
+  if (!list.length) { g.innerHTML = '<div class="empty">Belum ada stasiun di line ini. Buka aplikasi stasiun, isi URL Worker &amp; line yang sama, lalu Hubungkan.</div>'; return; }
+  g.innerHTML = list.map((s) => `<div class="card ${s.online ? '' : 'off'}" id="c-${esc(s.id)}" data-id="${esc(s.id)}">${cardHtml(s)}</div>`).join('');
+}
+
+function renderCard(id, flash) {
+  let el = document.getElementById('c-' + id);
+  if (!el) { renderGrid(); el = document.getElementById('c-' + id); }
+  if (!el) return;
+  const s = ST.stations[id];
+  el.className = 'card ' + (s.online ? '' : 'off');
+  el.innerHTML = cardHtml(s);
+  if (flash) { el.classList.add('alarm'); setTimeout(() => el.classList.remove('alarm'), 2500); }
+}
+
+function renderFeed() {
+  const f = $('#feed');
+  if (!ST.recent.length) { f.innerHTML = '<div class="empty">Belum ada hasil.</div>'; return; }
+  f.innerHTML = ST.recent.slice(0, 30).map((r) => `
+    <div class="item"><span class="r ${r.result.toLowerCase()}">${r.result}</span>
+      <span class="who small">${esc(r.name)} · ${esc(r.program || '')}<br><span class="muted mono">${tm(r.ts)} · ${Number(r.score).toFixed(3)}</span></span>
+      <span></span>${r.thumb ? `<img src="${r.thumb}" alt="NG">` : ''}</div>`).join('');
+}
+
+$('#grid').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-cmd]'); if (!b) return;
+  sendCmd(b.closest('.card').dataset.id, b.dataset.cmd);
+});
+$('#btnSettings').onclick = () => { $('#inWk').value = CFG.wkUrl; $('#inTok').value = CFG.token; $('#inRoom').value = CFG.room; $('#dlg').showModal(); };
+$('#dlg').addEventListener('close', () => {
+  if ($('#dlg').returnValue !== 'ok') return;
+  CFG = { wkUrl: $('#inWk').value.trim(), token: $('#inTok').value.trim(), room: $('#inRoom').value.trim() || 'line-1' };
+  saveCfg(); ST.retry = 0; connect();
+});
+connect();
+window.MON = ST;
+</script>
+</body>
+</html>
