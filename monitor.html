@@ -98,13 +98,14 @@ dialog input{background:#081325;border:1px solid var(--line2);border-radius:6px;
   <form method="dialog">
     <h3 style="margin-bottom:12px">Pengaturan Monitor</h3>
     <label>URL Worker Cloudflare<input type="url" id="inWk" placeholder="https://mapin-vision-rt.<akun>.workers.dev" required></label>
-    <label>Token aplikasi (APP_TOKEN)<input type="password" id="inTok"></label>
+    <label>Token admin (opsional — kosongkan bila dibuka dari situs resmi)<input type="password" id="inTok"></label>
     <label>Line / Room<input type="text" id="inRoom" value="line-1"></label>
     <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" value="cancel" formnovalidate>Batal</button><button class="btn primary" value="ok">Simpan &amp; Hubungkan</button></div>
   </form>
 </dialog>
 <div class="toast hidden" id="toast"></div>
 
+<script src="config.js"></script>
 <script>
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -116,6 +117,9 @@ function loadCfg() {
   if (!cfg.wkUrl) { // ambil dari pengaturan aplikasi stasiun di browser yang sama
     try { const s = JSON.parse(localStorage.getItem('mv_settings')) || {}; cfg = { wkUrl: s.wkUrl, token: s.token, room: s.room, ...cfg }; } catch {}
   }
+  const C = window.MV_CONFIG || {};
+  if (!cfg.wkUrl && C.workerUrl) cfg.wkUrl = C.workerUrl;
+  if (!cfg.room && C.room) cfg.room = C.room;
   const q = new URLSearchParams(location.search);
   if (q.get('room')) cfg.room = q.get('room');
   if (q.get('wk')) cfg.wkUrl = q.get('wk');

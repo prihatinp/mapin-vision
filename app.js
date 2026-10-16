@@ -60,6 +60,20 @@ function newProgram() {
 }
 
 const saveSettings = () => store('mv_settings', S.settings);
+
+/* Konfigurasi otomatis: config.js (admin) + parameter link (?room=&station=&name=) */
+(function autoConfig() {
+  const C = window.MV_CONFIG || {}, st = S.settings, q = new URLSearchParams(location.search);
+  if (!st.wkUrl && C.workerUrl) st.wkUrl = C.workerUrl.replace(/\/+$/, '');
+  if ((!st.room || st.room === 'line-1') && C.room) st.room = C.room;
+  if (q.get('room')) st.room = q.get('room');
+  if (q.get('station')) st.stationId = q.get('station');
+  if (q.get('name')) st.stationName = q.get('name');
+  if (q.get('worker')) st.wkUrl = q.get('worker');
+  st.room = String(st.room).toLowerCase().replace(/[^a-z0-9_-]+/g, '-').slice(0, 40) || 'line-1';
+  st.stationId = String(st.stationId).toLowerCase().replace(/[^a-z0-9_-]+/g, '-').slice(0, 40);
+  if (!st.stationName || st.stationName === 'Stasiun 1') st.stationName = 'Stasiun ' + st.stationId.replace(/^st-/, '').toUpperCase();
+})();
 const hasServer = () => !!(S.settings.gasUrl || S.settings.wkUrl);
 const cleanId = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').slice(0, 40);
 const saveProgramLocal = () => store('mv_program', S.program);
@@ -704,7 +718,7 @@ async function gas(action, data = {}) {
   if (!url) throw new Error('Isi URL Worker Cloudflare atau URL GAS (langkah 5).');
   const res = await fetch(url, {
     method: 'POST',
-    body: JSON.stringify({ action, token: S.settings.token, ...data }) // text/plain → tanpa preflight CORS
+    body: JSON.stringify({ action, ...data, token: S.settings.token }) // text/plain → tanpa preflight CORS
   });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const j = await res.json();
