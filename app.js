@@ -121,6 +121,12 @@ function refreshChips() {
 
 /* ============================== STEPS ============================== */
 
+function hint5() {
+  if (RT.state === 'on') return `✓ Tersambung otomatis ke Cloudflare (line ${S.settings.room}). Hasil inspeksi tersimpan di Google Sheet/Drive.`;
+  if (RT.state === 'connecting' || RT.state === 'retry') return 'Menghubungkan otomatis ke server…';
+  return S.settings.wkUrl ? 'Realtime dimatikan — centang "Kirim hasil realtime" untuk menyalakan.' : 'Server belum diatur di config.js.';
+}
+
 function goStep(n) {
   n = clamp(parseInt(n, 10) || 1, 1, 5);
   S.step = n;
@@ -136,7 +142,7 @@ function goStep(n) {
     2: 'Klik & tarik di gambar untuk membuat ROI, lalu daftarkan master.',
     3: S.program.ok.length ? 'Skor langsung dihitung — geser ambang sampai OK/NG sesuai.' : 'Daftarkan master dulu di langkah 2.',
     4: 'Tekan Mulai, atau ucapkan "mulai" / "periksa" ke asisten.',
-    5: 'Isi URL Worker Cloudflare & token, lalu Hubungkan. Data tersimpan di Google Sheet/Drive Anda.'
+    5: hint5()
   }[n]);
   if (n === 5 && hasServer() && S.server.state === 'ok') listPrograms();
 }
@@ -870,6 +876,7 @@ function rtInfo() {
     retry: 'Terputus — mencoba lagi otomatis… (log sementara dikirim langsung ke GAS)',
     err: 'Gagal membuka koneksi. Cek URL Worker.'
   }[RT.state];
+  if (S.step === 5) hint(hint5());
   const a = $('#lnkMonitor'); if (a) a.href = 'monitor.html?room=' + encodeURIComponent(S.settings.room || 'line-1');
 }
 function rtFields() {
